@@ -1,13 +1,17 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import * as tf from "@tensorflow/tfjs";
 import * as handpose from "@tensorflow-models/handpose";
 import Webcam from "react-webcam";
 import { nextFrame } from "@tensorflow/tfjs";
 import { drawHand } from "./utilities";
+import * as fp from "fingerpose";
+import thumbsup from "./images/thumbsup.png";
+import peace from "./images/peace.png";
 function App() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
-
+  const [status, setStatus] = useState(null);
+  const images = { thumbs_up: thumbsup, victory: peace };
   const runHandpose = async () => {
     const net = await handpose.load();
     console.log("Handpose loaded successfully");
@@ -34,7 +38,22 @@ function App() {
       canvasRef.current.height = videoHeight;
 
       const hand = await net.estimateHands(video);
-      console.log(hand);
+      // console.log(hand);
+
+      if (hand.length > 0) {
+        const GE = new fp.GestureEstimator([
+          fp.Gestures.VictoryGesture,
+          fp.Gestures.ThumbsUpGesture,
+        ]);
+        const gesture = await GE.estimate(hand[0].landmarks, 8);
+        console.log(gesture);
+        if (gesture.gestures != null && gesture.gestures.length > 0) {
+          const score = gesture.gestures.map((p) => p.score);
+          const maxScore = score.indexOf(Math.max.apply(null, score));
+          await setStatus(gesture.gestures[maxScore].name);
+          // console.log(status);
+        }
+      }
 
       const ctx = canvasRef.current.getContext("2d");
       drawHand(hand, ctx);
@@ -71,6 +90,23 @@ function App() {
           height: 480,
         }}
       />
+      {status != null ? (
+        <img
+          src={images[status]}
+          style={{
+            position: "absolute",
+            marginLeft: "auto",
+            marginRight: "auto",
+            left: 200,
+            bottom: 500,
+            right: 0,
+            textAlign: "center",
+            height: 100,
+          }}
+        />
+      ) : (
+        ""
+      )}
     </div>
   );
 }
